@@ -10,6 +10,7 @@ import (
 	"github.com/gato-preto-engenharia/pneuma/example/encoder"
 	"github.com/gato-preto-engenharia/pneuma/example/handler"
 	"github.com/gato-preto-engenharia/pneuma/example/routing"
+	"github.com/gato-preto-engenharia/pneuma/health"
 )
 
 func main() {
@@ -25,6 +26,7 @@ func main() {
 			"X-App-Version": "v1.0.1",
 		},
 		Routes: slices.Concat(
+			health.Routes,
 			routing.External,
 			[]pneuma.Route{
 				pneuma.NewRoute("GET /info", handler.Info),
