@@ -5,7 +5,9 @@
 package pneuma
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"slices"
@@ -90,12 +92,15 @@ func NewRoute(pattern string, handler Handler, middlewares ...Middleware) Route 
 // ServerSpec Is pneuma's basic HTTP server specification, it provides a side-effect free,
 // data first approach to serving requests
 type ServerSpec struct {
+	// The server context, used for external termination, if not provided will use [context.Background]
+	Ctx context.Context `json:"-"`
+
 	// The address on which pneuma's internal [http.ServerMux] must listen to
 	Address string `json:"address"`
 
 	// The static headers that will be included on all responses, they are applied before
 	// the [Handler] result headers
-	Headers Headers
+	Headers Headers `json:"headers"`
 
 	// ResultEncoder is the function used to encode the response body, if not
 	// provided pneuma will use the [JsonResultEncoder] function
@@ -109,7 +114,7 @@ type ServerSpec struct {
 	// RecoverFunc is the function called when a handler panics, server-level panics
 	// crash the application as expected, if not provided will log the error and
 	// return 500
-	RecoverFunc func(any)
+	RecoverFunc func(any) `json:"-"`
 
 	// The middlewares that should be applied to every route in this spec, if present
 	// they will be applied before the route specific middlewares
@@ -198,10 +203,33 @@ func ListenAndServe(spec ServerSpec) error {
 			}
 		})
 
-		slog.Debug("Registered Route", "pattern", route.Pattern, "name", route.Name)
+		slog.Debug("registered Route", "pattern", route.Pattern, "name", route.Name)
 	}
 
-	return http.ListenAndServe(spec.Address, mux)
+	server := &http.Server{Addr: spec.Address, Handler: mux}
+
+	ctx := spec.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	go func() {
+		<-ctx.Done()
+
+		slog.Info("received stopping signal, shutting down the pneuma server")
+
+		if err := server.Shutdown(context.Background()); err != nil {
+			slog.Error("failed to shutdown pneuma server", "error", err)
+		}
+	}()
+
+	if err := server.ListenAndServe(); err != nil {
+		if !errors.Is(err, http.ErrServerClosed) {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // MustListenAndServe Creates a [http.ServeMux] from a pneuma [ServerSpec] and starts listening on
