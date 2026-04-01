@@ -2,7 +2,6 @@ package main
 
 import (
 	"log/slog"
-	"net/http"
 	"os"
 	"slices"
 
@@ -21,12 +20,12 @@ func main() {
 	spec := pneuma.ServerSpec{
 		Address:       ":3000",
 		ResultEncoder: encoder.Result,
-		Headers: map[string]string{
+		Headers: pneuma.Headers{
 			"X-App-Name":    "Pneuma-Example",
 			"X-App-Version": "v1.0.1",
 		},
 		Routes: slices.Concat(
-			health.Routes,
+			health.Routes(""),
 			routing.External,
 			[]pneuma.Route{
 				pneuma.NewRoute("GET /info", handler.Info),
@@ -38,7 +37,7 @@ func main() {
 		},
 		Middlewares: []pneuma.Middleware{
 			func(next pneuma.Handler) pneuma.Handler {
-				return func(r *http.Request) pneuma.Result {
+				return func(r pneuma.Request) pneuma.Result {
 					slog.Info("Spec level middleware!")
 
 					return next(r)

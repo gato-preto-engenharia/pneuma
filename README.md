@@ -21,7 +21,7 @@ func main() error {
 	spec := pneuma.ServerSpec{
 		Address: ":8000",
 		Routes: []pneuma.Route{
-			pneuma.NewRoute("GET /status", func(_ *http.Request) pneuma.Result {
+			pneuma.NewRoute("GET /status", func(_ pneuma.Request) pneuma.Result {
 				return pneuma.NewResult(http.StatusOK, map[string]string{
 					"status": "alive",
 				})

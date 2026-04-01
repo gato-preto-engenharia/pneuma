@@ -7,10 +7,10 @@ import (
 	"github.com/gato-preto-engenharia/pneuma"
 )
 
-func Info(r *http.Request) pneuma.Result {
+func Info(r pneuma.Request) pneuma.Result {
 	return pneuma.NewResult(
 		http.StatusOK,
-		map[string]string{
+		pneuma.Headers{
 			"alive": "yes",
 		},
 		pneuma.Headers{
@@ -20,7 +20,7 @@ func Info(r *http.Request) pneuma.Result {
 	)
 }
 
-func Fail(r *http.Request) pneuma.Result {
+func Fail(r pneuma.Request) pneuma.Result {
 	return pneuma.NewResult(
 		http.StatusUnprocessableEntity, errors.New("failed to process request"))
 }

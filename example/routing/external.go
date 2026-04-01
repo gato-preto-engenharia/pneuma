@@ -16,7 +16,7 @@ var External = []pneuma.Route{
 		Handler: pneuma.Constantly(pneuma.NewEmptyResult(http.StatusNoContent)),
 		Middlewares: []pneuma.Middleware{
 			func(next pneuma.Handler) pneuma.Handler {
-				return func(r *http.Request) pneuma.Result {
+				return func(r pneuma.Request) pneuma.Result {
 					slog.Info("Route level middleware!")
 
 					return next(r)

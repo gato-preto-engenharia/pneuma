@@ -8,13 +8,75 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"slices"
 )
 
+var (
+	ErrCannotDecodeJson = errors.New("cannot decode as json")
+)
+
 // Headers is a wrapper over map\[string\]string
 type Headers map[string]string
+
+// Request Is pneuma abstraction over [http.Request]
+type Request struct {
+	// The request HTTP method
+	Method string
+
+	// The request headers
+	Headers Headers
+
+	// The request body byte array
+	Body []byte
+
+	// The underlaying [http.Request] object, note that the body will already be
+	// closed when consuming it
+	Raw *http.Request
+}
+
+func NewRequest(r *http.Request) Request {
+	headers := make(Headers, len(r.Header))
+
+	for k, v := range r.Header {
+		if len(v) > 0 {
+			headers[k] = v[0]
+		}
+	}
+
+	var body []byte
+	if r.Body != nil {
+		body, _ = io.ReadAll(r.Body)
+	}
+
+	return Request{
+		Method:  r.Method,
+		Headers: headers,
+		Body:    body,
+		Raw:     r,
+	}
+}
+
+// PathVariable Returns a path variable with the corresponding key
+func (r Request) PathVariable(key string) (string, bool) {
+	value := r.Raw.PathValue(key)
+	if len(value) == 0 {
+		return "", false
+	}
+
+	return value, true
+}
+
+// DecodeJson Decode the request bytes as a JSON into the target pointer using [json.Unmarshal]
+func (r Request) DecodeJson(target any) error {
+	if err := json.Unmarshal(r.Body, target); err != nil {
+		return ErrCannotDecodeJson
+	}
+
+	return nil
+}
 
 // Result Is pneuma's response interface
 type Result struct {
@@ -59,7 +121,7 @@ func NewEmptyResult(status int) Result {
 }
 
 // Handler Is pneuma's request server-side handler
-type Handler func(r *http.Request) Result
+type Handler func(r Request) Result
 
 // Middleware Is pneuma's server-side middleware implementation
 type Middleware func(Handler) Handler
@@ -162,7 +224,8 @@ func ListenAndServe(spec ServerSpec) error {
 				}
 			}()
 
-			result := wrappedHandler(request)
+			req := NewRequest(request)
+			result := wrappedHandler(req)
 
 			level := slog.LevelInfo
 			if result.Status >= 400 && result.Status < 500 {
@@ -172,10 +235,10 @@ func ListenAndServe(spec ServerSpec) error {
 			}
 
 			slog.Log(
-				request.Context(),
+				req.Raw.Context(),
 				level,
 				"received request",
-				slog.Group("req", "host", request.Host, "method", request.Method, "path", request.URL.Path),
+				slog.Group("req", "host", req.Raw.Host, "method", req.Raw.Method, "path", req.Raw.URL.Path),
 				slog.Group("res", "status", result.Status))
 
 			for headerKey, headerValue := range spec.Headers {
@@ -245,7 +308,7 @@ func MustListenAndServe(spec ServerSpec) {
 // Constantly returns a [Handler] that always responds with the given [Result],
 // regardless of the request contents
 func Constantly(res Result) Handler {
-	return func(_ *http.Request) Result {
+	return func(_ Request) Result {
 		return res
 	}
 }

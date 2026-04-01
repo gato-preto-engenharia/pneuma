@@ -1,25 +1,28 @@
-// health provide plug and play route mapped at "GET /pneuma/v1/health" for healthchecks
+// health provide plug and play route mapped at "GET {prefix}/health" for healthchecks
 package health
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gato-preto-engenharia/pneuma"
 )
 
-type Response struct {
+type response struct {
 	Status string `json:"status,omitempty"`
 }
 
-var Routes = []pneuma.Route{
-	{
-		Name:    "pneuma.healthcheck",
-		Pattern: "GET /pneuma/v1/health",
-		Handler: pneuma.Constantly(pneuma.Result{
-			Status: http.StatusOK,
-			Body: Response{
-				Status: "alive",
-			},
-		}),
-	},
+func Routes(prefix string) []pneuma.Route {
+	return []pneuma.Route{
+		{
+			Name:    "pneuma.healthcheck",
+			Pattern: fmt.Sprintf("GET %s/health", prefix),
+			Handler: pneuma.Constantly(pneuma.Result{
+				Status: http.StatusOK,
+				Body: response{
+					Status: "alive",
+				},
+			}),
+		},
+	}
 }
